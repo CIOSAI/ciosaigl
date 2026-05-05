@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "build": "deno run -A npm:vite build"
+    "build": "deno run -A npm:vite build --watch"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1",
