@@ -1,3 +1,4 @@
+import {vbasic} from "./globalGlsl.ts";
 import * as Trans from "./matrix.ts";
 
 const TAU = 6.2831853071;
@@ -197,6 +198,11 @@ class Util {
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertBf);
     this.gl.enableVertexAttribArray(this.aVertexPositionLoc);
     this.gl.vertexAttribPointer(this.aVertexPositionLoc, 3, this.gl.FLOAT, false, 0, 0);
+
+    // if vertex code didn't change, at least provide an identify transform
+    if (vcode===vbasic) {
+      this.setUniform(program, "mat4", "xform", Trans.identity);
+    }
 
     return program;
   }
