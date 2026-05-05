@@ -9,6 +9,7 @@ class CiosaiGL {
   desiredFrameRate:number;
   running:boolean;
   backgroundRect:ShapeWrap;
+  textureSlotNames:string[] = [];
   constructor (webgl:WebGL2RenderingContext) {
     this.gl = webgl;
     this.util = new Util(webgl);
@@ -61,6 +62,10 @@ class CiosaiGL {
     this.util.setUniform(this.basicProgram, 'vec4', 'color', vec4);
   }
 
+/**
+  * when using sampler2D, value[0] is your framebuffer, value[1] is the texture slot
+  * prefer using getNamedTextureSlot("coolShader-inputA"), but feel free to use any positive integer, stay away from 0 if possible
+  */
   setUniform (program:WebGLProgram, list:{type:GLSLTypeString,key:string,value:number[]}[]) {
     for (let item of list) {
       this.util.setUniform(program, item.type, item.key, item.value);
@@ -77,6 +82,28 @@ class CiosaiGL {
 
   getFb (ind:number) {
     this.util.getFb(ind);
+  }
+
+  // it is indeed 1 higher, due to texture0 being designated as undefined
+  getNamedTextureSlot(name:string) {
+    let searchAttempt = this.textureSlotNames.indexOf(name);
+    if (searchAttempt===-1) {
+      this.textureSlotNames.push(name);
+      return this.textureSlotNames.length;
+    }
+    else {
+      return searchAttempt+1;
+    }
+  }
+
+  freeNamedTextureSlot(name:string) {
+    let searchAttempt = this.textureSlotNames.indexOf(name);
+    if (searchAttempt===-1) {
+      console.warn(`there is no texture slot named '${name}', nothing freed`);
+    }
+    else {
+      this.textureSlotNames.splice(searchAttempt, 1);
+    }
   }
 
   initShader (fShader:string, vShader=Shaders.vbasic) {

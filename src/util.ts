@@ -129,13 +129,14 @@ enum ChannelFormat {
   FLOAT = 5126,
 }
 
-type GLSLTypeString = 'float'|'int'|'vec2'|'vec3'|'vec4'|'ivec2'|'ivec3'|'ivec4'|'mat2'|'mat3'|'mat4';
+type GLSLTypeString = 'float'|'int'|'vec2'|'vec3'|'vec4'|'ivec2'|'ivec3'|'ivec4'|'mat2'|'mat3'|'mat4'|'sampler2D';
 
 interface FramebufferWrap {
   fb:WebGLFramebuffer;
   width:number;
   height:number;
   format:ImageFormat;
+  texture:WebGLTexture;
 }
 
 /**
@@ -149,6 +150,7 @@ interface ShapeWrap {
 
 class Util {
   gl:WebGL2RenderingContext;
+  GL_TEXTURE_0 = 33984;
   aVertexPositionLoc = 0;
   vertPrefix = `#version 300 es\nlayout(location = ${this.aVertexPositionLoc}) in vec3 aVertexPosition;\n`;
   fragPrefix = `#version 300 es\nprecision mediump float;\n#define PI acos(-1.)\n#define TAU (PI*2.)\nout vec4 FragColor;\n`;
@@ -228,6 +230,9 @@ class Util {
     this.gl.bindTexture(this.gl.TEXTURE_2D, tex);
     this.gl.texImage2D(this.gl.TEXTURE_2D, 0, format, width, height, 
                        0, componentFormat, componentType, arrayConstructor(width*height*componentPerPixel));
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
 
     this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, this.gl.TEXTURE_2D, tex, 0);
 
@@ -235,7 +240,7 @@ class Util {
     this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
 
     let ind = this.fbs.length;
-    this.fbs.push({fb: fb, width: width, height: height, format: format});
+    this.fbs.push({fb: fb, width: width, height: height, format: format, texture: tex});
     return ind;
   }
 
@@ -246,6 +251,19 @@ class Util {
 
   getFb (who:number) {
     return this.fbs[who];
+  }
+
+  getTextureSlotEnum (index:number) {
+    let maximum = this.gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS;
+    if (index<0) {
+      console.warn(`attempted to use negative texture slot of ${index}, defaulted to 0th`);
+      return this.GL_TEXTURE_0;
+    }
+    if (index>=maximum) {
+      console.warn(`sorry, this device only has ${maximum} image slots. you attempted to use the ${index}th. defaulted to 0th`);
+      return this.GL_TEXTURE_0;
+    }
+    return this.GL_TEXTURE_0+index;
   }
 
   pushVerts (_program:WebGLProgram, floatArray:number[], triangleCnt: number): ShapeWrap {
@@ -267,6 +285,10 @@ class Util {
     this.gl.useProgram(program);
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertBf);
     this.gl.drawArrays(this.gl.TRIANGLE_STRIP, uploadedShape.loc/3/4, uploadedShape.tri);
+
+    // for sampler2D uniforms, they can't get reset before drawing, so resetting them here
+    this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+    this.gl.activeTexture(this.GL_TEXTURE_0);
   }
 
   setUniform (program:WebGLProgram, type: GLSLTypeString, key:string, value:number[]) {
@@ -290,6 +312,27 @@ class Util {
     }
     else if (matchMat) {
       this.gl[`uniformMatrix${matchMat[1]}fv`](loc, false, new Float32Array(value));
+    }
+    else if (type==='sampler2D') {
+      // 0th slot is being used as a fallback
+      if (value.length<2) {
+	console.warn(`data missing for sampler2D ${key}
+value[0] is the framebuffer that holds the input data
+value[1] is the texture slot to put it in
+data that was provided:
+${value}
+`);
+	return;
+      }
+      if (value[0]>=this.fbs.length) {
+	console.warn(`attempted to index a non-existent framebuffer of index ${value[0]} for sampler2D ${key}`);
+	return;
+      }
+      let inputFb = this.getFb(value[0]);
+      let slotEnum = this.getTextureSlotEnum(value[1]);
+      this.gl.activeTexture(slotEnum);
+      this.gl.bindTexture(this.gl.TEXTURE_2D, inputFb.texture);
+      this.gl.uniform1i(loc, slotEnum===this.GL_TEXTURE_0?0:value[1]);
     }
     else {
       console.warn(`unidentified type : ${type}, try float, int, vec or mat`);
