@@ -1,6 +1,6 @@
-import { CiosaiGL, Shapes, Trans } from "./main.ts";
+import { CiosaiGL, Shapes, Trans } from "../main.ts";
 
-(()=>{
+export function solidExample() {
   let canvas = document.createElement('canvas') as HTMLCanvasElement;
   canvas.width = 1920; canvas.height = 1080;
   canvas.style.width = '100lvw'; canvas.style.height = '100lvh';
@@ -12,12 +12,9 @@ import { CiosaiGL, Shapes, Trans } from "./main.ts";
 
   ciosai.run((time:number)=>{
     ciosai.color([Math.sin(time)*0.5+0.5, 0, 0, 1]);
-    ciosai.xform(Trans.multAll([
-      Trans.scale(9/16,1,1),
-      Trans.scale(1, 1, 1),
-    ]));
+    ciosai.xform(Trans.scale(9/16,1,1));
     ciosai.drawShape(circle);
   });
 
   document.body.appendChild(canvas);
-})();
+};
